@@ -12,10 +12,11 @@ public class VideoDataTest {
     private String poster = "shake.jpg";
     private String video = "syake.mkv";
     private int numberOfEpisodes = 1;
+    private String assetUri = "";
 
     @Before
     public void setUp() throws Exception {
-        shake = new VideoData(title, poster, video, numberOfEpisodes);
+        shake = new VideoData(title, poster, video, numberOfEpisodes, assetUri);
     }
 
     @Test
