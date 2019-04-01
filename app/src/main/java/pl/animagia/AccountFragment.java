@@ -5,13 +5,11 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentTransaction;
-import android.text.Html;
-import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -19,7 +17,6 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.Volley;
 import pl.animagia.error.Alerts;
-import pl.animagia.file.FileUrl;
 import pl.animagia.html.CookieRequest;
 import pl.animagia.user.Cookies;
 
@@ -32,17 +29,35 @@ public class AccountFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         int layoutResource = isLogged() ?
-                R.layout.fragment_account_empty : R.layout.fragment_account_empty; //TODO
+                R.layout.fragment_account : R.layout.fragment_account_empty; //TODO
 
-        return inflater.inflate(layoutResource, container, false);
+        View contents = inflater.inflate(layoutResource, container, false);
+
+        FrameLayout frame = (FrameLayout) inflater.inflate(R.layout.fragment_frame, container, false);
+
+        frame.addView(contents);
+
+        return frame;
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         if(isLogged()) {
-            getFiles();//FIXME
+            getAccountInfo();
+        } else {
+            Button loginButton = getView().findViewById(R.id.linkExistingAccountButton);
+            loginButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    activateLoginFragment();
+                }
+            });
         }
+    }
+
+    private void activateLoginFragment() {
+        ((MainActivity) getActivity()).activateFragment(new LoginFragment());
     }
 
     private boolean isLogged(){
@@ -57,17 +72,13 @@ public class AccountFragment extends Fragment {
         return logIn;
     }
 
-    private void getFiles(){ //FIXME
-        String url = "https://animagia.pl/";
+    private void getAccountInfo(){ //FIXME
+        String url = "https://animagia.pl/konto";
         RequestQueue queue = Volley.newRequestQueue(getContext());
         CookieRequest stringRequest = new CookieRequest(Request.Method.GET, url, new Response.Listener<String>() {
             @Override
             public void onResponse(String s) {
-                TextView textView = getView().findViewById(R.id.files);
-                String text = FileUrl.getText(s);
-                textView.setText(Html.fromHtml(text));
-                textView.setClickable(true);
-                textView.setMovementMethod(new LinkMovementMethod());
+                onAccountPageFetched(s);
             }
         }, new Response.ErrorListener() {
             @Override
@@ -75,7 +86,7 @@ public class AccountFragment extends Fragment {
                 DialogInterface.OnClickListener onClickTryAgain = new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        getFiles();
+                        getAccountInfo();
                     }
                 };
                 Alerts.internetConnectionError(getContext(), onClickTryAgain);
@@ -85,4 +96,36 @@ public class AccountFragment extends Fragment {
         stringRequest.setCookies(cookie);
         queue.add(stringRequest);
     }
+
+    private void onAccountPageFetched(String s) {
+        TextView textView = getView().findViewById(R.id.files);
+        textView.setText(extractAccountStatus(s) + "\n" + extractUserEmail(s));
+    }
+
+    private static String extractAccountStatus(String accountPageHtml) {
+        if(accountPageHtml.contains("<strong>Wygasające</strong>")) {
+            return "Wyagasające";
+        } else if(accountPageHtml.contains("<strong>Aktywne.</strong>")) {
+            return "Aktywne";
+        } else if(accountPageHtml.contains("<p>Nieaktywne.</p>")) {
+            return "Nieaktywne";
+        }
+        return "";
+    }
+
+    private static String extractUserEmail(String accountPageHtml) {
+        String s1 = "Zalogowano jako:";
+        String s2 = "<a href=\"https://animagia.pl/wp-login.php?action=logout";
+
+        int start = s1.length() + accountPageHtml.indexOf(s1);
+        int end = accountPageHtml.indexOf(s2);
+
+        try {
+            String emailWithDot = accountPageHtml.substring(start, end).trim();
+            return emailWithDot.substring(0,emailWithDot.length() - 1);
+        } catch (StringIndexOutOfBoundsException e) {
+            return "";
+        }
+    }
+
 }
