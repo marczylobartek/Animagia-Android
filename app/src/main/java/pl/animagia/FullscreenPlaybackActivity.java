@@ -47,7 +47,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private String [] timeStamps;
     private long start, difference, totalSecond = 0;
     private AppCompatActivity control;
-    private boolean on_off = true;
+    private boolean on_off, firstOnStart = true;
 
     private Context context;
     private String cookie;
@@ -62,19 +62,19 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         {
             if(mPlayer != null){
                 if(mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY ) {
-                    difference = System.currentTimeMillis() - start;
-                    totalSecond = difference / 1000;
 
-                  if(totalSecond >= 4 && on_off){
+                    if (on_off == true){
+                        on_off = false;
+                        difference = System.currentTimeMillis() - start;
+                        totalSecond = difference / 1000;
+                    }
+                  if(totalSecond >= 5){
                     Intent intent = getIntent();
                     VideoData video = intent.getParcelableExtra(VideoData.NAME_OF_INTENT_EXTRA);
-                    Toast.makeText(context, "=" + difference, Toast.LENGTH_SHORT).show();                   
+                    Toast.makeText(context, "=" + difference, Toast.LENGTH_SHORT).show();
                     reinitializationPlayer(video);
-
                   }
-					on_off = false;
                 }
-
             }
             mHideHandler.post(this);
         }
@@ -153,10 +153,36 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+
+        PlayerControlView controlView = ViewUtilsKt.getPlayerControlView(mMainView);
+        View play = controlView.findViewById(R.id.exo_play);
+        play.performClick();
+        start = System.currentTimeMillis();
+        on_off = true;
+    }
+
+    @Override
     protected void onStart() {
         super.onStart();
 
-        runTimer();
+        if(firstOnStart){
+            runTimer();
+            firstOnStart = false;
+        }
+
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+
+        PlayerControlView controlView = ViewUtilsKt.getPlayerControlView(mMainView);
+        View play = controlView.findViewById(R.id.exo_play);
+        play.performClick();
+        start = System.currentTimeMillis();
+        on_off = true;
     }
 
     @Override
@@ -200,8 +226,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
             }
         });
-        difference = System.currentTimeMillis() - start;
-        totalSecond = difference / 1000;
+        on_off = true;
     }
 
     private int calculateMsTimeStamp(String timeStampUnconvert){
