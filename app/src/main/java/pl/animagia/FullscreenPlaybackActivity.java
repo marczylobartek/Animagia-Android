@@ -24,11 +24,6 @@ import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
-
 import pl.animagia.error.Alerts;
 import pl.animagia.html.HTML;
 import pl.animagia.html.VolleyCallback;
@@ -42,7 +37,6 @@ import pl.animagia.video.VideoUrl;
  */
 public class FullscreenPlaybackActivity extends AppCompatActivity {
 
-    private final Handler mHideHandler = new Handler();
 
     private PlayerView mMainView;
 
@@ -53,11 +47,39 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private String [] timeStamps;
     private long start, difference, totalSecond = 0;
     private AppCompatActivity control;
+    private boolean on_off = true;
 
     private Context context;
     private String cookie;
 
     private boolean systemUiAndControlsVisible;
+
+    private Handler mHideHandler;
+
+    Runnable rExpire = new Runnable()
+    {
+        public void run()
+        {
+            if(mPlayer != null){
+                if(mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY ) {
+                    difference = System.currentTimeMillis() - start;
+                    totalSecond = difference / 1000;
+
+                  if(totalSecond >= 4 && on_off){
+                    Intent intent = getIntent();
+                    VideoData video = intent.getParcelableExtra(VideoData.NAME_OF_INTENT_EXTRA);
+                    Toast.makeText(context, "=" + difference, Toast.LENGTH_SHORT).show();                   
+                    reinitializationPlayer(video);
+
+                  }
+					on_off = false;
+                }
+
+            }
+            mHideHandler.post(this);
+        }
+
+    };
 
     final Handler handler = new Handler();
     final Runnable r = new Runnable()
@@ -92,7 +114,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         control = this;
         Intent intent = getIntent();
         final VideoData video = intent.getParcelableExtra(VideoData.NAME_OF_INTENT_EXTRA);
-        String url = intent.getStringExtra(VideoData.NAME_OF_URL);
+        final String url = intent.getStringExtra(VideoData.NAME_OF_URL);
         cookie = intent.getStringExtra(Cookies.LOGIN);
 
         episodes = video.getEpisodes();
@@ -116,30 +138,42 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                 return true;
             }
         });
-        
+
         listenToSystemUiChanges();
 
-
-
-            start = System.currentTimeMillis();
-            mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(this, url, video.getTitle()));
-            if(!isPrime(video.getTitle())){
-                if(cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
-                    handler.postDelayed(r, 300);
-                }
+        start = System.currentTimeMillis();
+        mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(this, url, video.getTitle()));
+        if(!isPrime(video.getTitle())){
+            if(cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
+                handler.postDelayed(r, 300);
             }
+        }
 
-            mPlayer.setPlayWhenReady(true);
-
-            difference = System.currentTimeMillis() - start;
-            totalSecond = difference / 1000;
-
-            Toast.makeText(control, "=" + difference, Toast.LENGTH_SHORT).show();
-            while (totalSecond >= 4){
-                mPlayer = null;
-                reinitializationPlayer(video);
-           }
+        mPlayer.setPlayWhenReady(true);
     }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        runTimer();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        mHideHandler.removeCallbacks(rExpire);
+        rExpire = null;
+    }
+
+    private void runTimer(){
+
+         mHideHandler = new Handler();
+         mHideHandler.post(rExpire);
+
+     }
+
 
     private void reinitializationPlayer(final VideoData video){
         start = System.currentTimeMillis();
@@ -294,10 +328,10 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private void hideSystemUi() {
         mMainView.setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
 
     private boolean isPrime(String title) {
@@ -339,6 +373,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         releaseMediaPlayer();
+        mHideHandler.removeCallbacks(rExpire);
+        rExpire = null;
         finish();
     }
 
