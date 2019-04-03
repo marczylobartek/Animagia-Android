@@ -40,4 +40,40 @@ public class VideoUrl {
 
         return urlLine;
     }
+
+
+    public static String getMessage(String html){
+        String line = getLineMessage(html);
+        int firstIndex = line.indexOf("Ten link wygasł");
+
+        String customString = "";
+        if (line.equals("")) {
+            return line;
+        } else {
+            customString =  line.substring(firstIndex);
+        }
+
+        return customString;
+    }
+
+
+    private static String getLineMessage(String html) {
+        Boolean read = true;
+        String MessageLine = "";
+        BufferedReader reader = new BufferedReader(new StringReader(html));
+        try {
+            String line = reader.readLine();
+            while(line != null && read){
+                if(line.contains("Ten link wygasł")){
+                    MessageLine = line;
+                    read = false;
+                }
+                line = reader.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return MessageLine;
+    }
 }

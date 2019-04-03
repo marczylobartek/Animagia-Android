@@ -24,6 +24,9 @@ import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 
 import pl.animagia.error.Alerts;
@@ -48,6 +51,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private int currentEpisode;
     private String timeStampUnconverted;
     private String [] timeStamps;
+    private long start, difference, totalSecond = 0;
+    private AppCompatActivity control;
 
     private Context context;
     private String cookie;
@@ -84,10 +89,10 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         context = this;
-
+        control = this;
         Intent intent = getIntent();
         final VideoData video = intent.getParcelableExtra(VideoData.NAME_OF_INTENT_EXTRA);
-        final String url = intent.getStringExtra(VideoData.NAME_OF_URL);
+        String url = intent.getStringExtra(VideoData.NAME_OF_URL);
         cookie = intent.getStringExtra(Cookies.LOGIN);
 
         episodes = video.getEpisodes();
@@ -102,10 +107,6 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         OwnTimeBar chapterMarker = findViewById(R.id.exo_progress);
         addTimeStamps(chapterMarker, timeStamps);
 
-       //  Toast.makeText(this, timeStamps.length + "", Toast.LENGTH_SHORT).show();
-       //  chapterMarker.addChapterMarker((long)200 * 1000);
-       //  chapterMarker.addChapterMarker((long)300 * 1000);
-
         mMainView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
@@ -118,16 +119,56 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         
         listenToSystemUiChanges();
 
-        mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(this, url, video.getTitle()));
-        if(!isPrime(video.getTitle())){
-            if(cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
-                handler.postDelayed(r, 300);
-            }
-        }
 
-        mPlayer.setPlayWhenReady(true);
+
+            start = System.currentTimeMillis();
+            mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(this, url, video.getTitle()));
+            if(!isPrime(video.getTitle())){
+                if(cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
+                    handler.postDelayed(r, 300);
+                }
+            }
+
+            mPlayer.setPlayWhenReady(true);
+
+            difference = System.currentTimeMillis() - start;
+            totalSecond = difference / 1000;
+
+            Toast.makeText(control, "=" + difference, Toast.LENGTH_SHORT).show();
+            while (totalSecond >= 4){
+                mPlayer = null;
+                reinitializationPlayer(video);
+           }
     }
 
+    private void reinitializationPlayer(final VideoData video){
+        start = System.currentTimeMillis();
+        HTML.getHtml(video.getVideoUrl(), getApplicationContext(), new VolleyCallback() {
+
+            @Override
+            public void onSuccess(String result) {
+                releaseMediaPlayer();
+                String url = VideoUrl.getUrl(result);
+                mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(control, url, video.getTitle()));
+                if (!isPrime(video.getTitle())) {
+                    if (cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
+                        handler.postDelayed(r, 300);
+                    }
+                }
+
+                mPlayer.setPlayWhenReady(true);
+                TextView title = findViewById(R.id.film_name);
+                title.setText("Reinicjalizacja");
+            }
+
+            @Override
+            public void onFailure(VolleyError volleyError) {
+
+            }
+        });
+        difference = System.currentTimeMillis() - start;
+        totalSecond = difference / 1000;
+    }
 
     private int calculateMsTimeStamp(String timeStampUnconvert){
 
