@@ -43,6 +43,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private SimpleExoPlayer mPlayer;
     private int episodes;
     private int currentEpisode;
+    private String currentTitle;
+    private String currentUrl;
     private String timeStampUnconverted;
     private String [] timeStamps;
     private long start, difference, totalSecond = 0;
@@ -68,12 +70,10 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                         difference = System.currentTimeMillis() - start;
                         totalSecond = difference / 1000;
                     }
-                  if(totalSecond >= 5){
-                    Intent intent = getIntent();
-                    VideoData video = intent.getParcelableExtra(VideoData.NAME_OF_INTENT_EXTRA);
+                   if(totalSecond >= 5){
                     Toast.makeText(context, "=" + difference, Toast.LENGTH_SHORT).show();
-                    reinitializationPlayer(video);
-                  }
+                    reinitializationPlayer();
+                   }
                 }
             }
             mHideHandler.post(this);
@@ -119,6 +119,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
         episodes = video.getEpisodes();
         currentEpisode = 1;
+        currentTitle = video.getTitle();
+        currentUrl = video.getVideoUrl();
 
         setContentView(R.layout.activity_fullscreen_playback);
         mMainView = findViewById(R.id.exoplayerview_activity_video);
@@ -201,16 +203,16 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
      }
 
 
-    private void reinitializationPlayer(final VideoData video){
+    private void reinitializationPlayer(){
         start = System.currentTimeMillis();
-        HTML.getHtml(video.getVideoUrl(), getApplicationContext(), new VolleyCallback() {
+        HTML.getHtml(currentUrl, getApplicationContext(), new VolleyCallback() {
 
             @Override
             public void onSuccess(String result) {
                 releaseMediaPlayer();
                 String url = VideoUrl.getUrl(result);
-                mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(control, url, video.getTitle()));
-                if (!isPrime(video.getTitle())) {
+                mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(control, url, currentTitle));
+                if (!isPrime(currentTitle)) {
                     if (cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
                         handler.postDelayed(r, 300);
                     }
@@ -423,10 +425,15 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if (checkEpisodes(newEpisode)) {
+                    start = System.currentTimeMillis();
                     HTML.getHtml(video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode), getApplicationContext(), new VolleyCallback() {
 
                         @Override
                         public void onSuccess(String result) {
+
+                            currentTitle = video.getTitle();
+                            currentUrl = video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode);
+
                             releaseMediaPlayer();
                             String url = VideoUrl.getUrl(result);
                             mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(activity, url, video.getTitle()));
@@ -447,6 +454,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
                         }
                     });
+                    on_off = true;
                 }
 
             }
