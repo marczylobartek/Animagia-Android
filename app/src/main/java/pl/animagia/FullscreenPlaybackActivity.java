@@ -65,10 +65,10 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
                 if (on_off == true) {
                     if ((mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY) ||
-                            (mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_BUFFERING)) {
+                            (mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_BUFFERING) ) {
 
                     }else{
-                        Toast.makeText(context, "=", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, "Restart playera", Toast.LENGTH_SHORT).show();
                         reinitializationPlayer();
                         }
                     on_off = false;
@@ -223,16 +223,18 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                     TextView title = findViewById(R.id.film_name);
                     title.setText(currentTitle + " odc. " + currentEpisode);
                 }
+                mHideHandler.postDelayed(rExpire,4000);
+                on_off = true;
 
             }
 
             @Override
             public void onFailure(VolleyError volleyError) {
-
+                mHideHandler.postDelayed(rExpire,4000);
+                on_off = true;
             }
         });
-        mHideHandler.postDelayed(rExpire,4000);
-        on_off = true;
+
     }
 
     private int calculateMsTimeStamp(String timeStampUnconvert){
@@ -448,18 +450,22 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                             }
 
                             mPlayer.setPlayWhenReady(true);
+
                             changeCurrentEpisodes(newEpisode);
                             TextView title = findViewById(R.id.film_name);
                             title.setText(video.getTitle() + " odc. " + currentEpisode);
+                            mHideHandler.postDelayed(rExpire,4000);
+                            on_off = true;
                         }
 
                         @Override
                         public void onFailure(VolleyError volleyError) {
-
+                            mHideHandler.postDelayed(rExpire,4000);
+                            on_off = true;
                         }
                     });
-                    mHideHandler.postDelayed(rExpire,4000);
-                    on_off = true;
+
+
                 }
 
             }
