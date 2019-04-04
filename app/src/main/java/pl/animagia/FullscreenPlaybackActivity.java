@@ -47,7 +47,6 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private String currentUrl;
     private String timeStampUnconverted;
     private String [] timeStamps;
-    private long start, difference, totalSecond = 0;
     private AppCompatActivity control;
     private boolean on_off, firstOnStart = true;
 
@@ -63,20 +62,18 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         public void run()
         {
             if(mPlayer != null){
-                if(mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY ) {
 
-                    if (on_off == true){
-                        on_off = false;
-                        difference = System.currentTimeMillis() - start;
-                        totalSecond = difference / 1000;
-                    }
-                   if(totalSecond >= 5){
-                    Toast.makeText(context, "=" + difference, Toast.LENGTH_SHORT).show();
-                    reinitializationPlayer();
-                   }
+                if (on_off == true) {
+                    if ((mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY) ||
+                            (mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_BUFFERING)) {
+
+                    }else{
+                        Toast.makeText(context, "=", Toast.LENGTH_SHORT).show();
+                        reinitializationPlayer();
+                        }
+                    on_off = false;
                 }
             }
-            mHideHandler.post(this);
         }
 
     };
@@ -143,7 +140,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
         listenToSystemUiChanges();
 
-        start = System.currentTimeMillis();
+
         mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(this, url, video.getTitle()));
         if(!isPrime(video.getTitle())){
             if(cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
@@ -161,7 +158,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         PlayerControlView controlView = ViewUtilsKt.getPlayerControlView(mMainView);
         View play = controlView.findViewById(R.id.exo_play);
         play.performClick();
-        start = System.currentTimeMillis();
+
+        mHideHandler.postDelayed(rExpire,4000);
         on_off = true;
     }
 
@@ -183,7 +181,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         PlayerControlView controlView = ViewUtilsKt.getPlayerControlView(mMainView);
         View play = controlView.findViewById(R.id.exo_play);
         play.performClick();
-        start = System.currentTimeMillis();
+
+        mHideHandler.postDelayed(rExpire,4000);
         on_off = true;
     }
 
@@ -198,13 +197,13 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private void runTimer(){
 
          mHideHandler = new Handler();
-         mHideHandler.post(rExpire);
+         mHideHandler.postDelayed(rExpire,4000);
 
      }
 
 
     private void reinitializationPlayer(){
-        start = System.currentTimeMillis();
+
         HTML.getHtml(currentUrl, getApplicationContext(), new VolleyCallback() {
 
             @Override
@@ -219,8 +218,12 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                 }
 
                 mPlayer.setPlayWhenReady(true);
-                TextView title = findViewById(R.id.film_name);
-                title.setText("Reinicjalizacja");
+
+                if (currentEpisode > 1){
+                    TextView title = findViewById(R.id.film_name);
+                    title.setText(currentTitle + " odc. " + currentEpisode);
+                }
+
             }
 
             @Override
@@ -228,6 +231,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
             }
         });
+        mHideHandler.postDelayed(rExpire,4000);
         on_off = true;
     }
 
@@ -425,7 +429,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if (checkEpisodes(newEpisode)) {
-                    start = System.currentTimeMillis();
+
                     HTML.getHtml(video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode), getApplicationContext(), new VolleyCallback() {
 
                         @Override
@@ -454,6 +458,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
                         }
                     });
+                    mHideHandler.postDelayed(rExpire,4000);
                     on_off = true;
                 }
 

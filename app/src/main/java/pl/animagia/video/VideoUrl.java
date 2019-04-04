@@ -41,8 +41,11 @@ public class VideoUrl {
         return urlLine;
     }
 
-
-    public static String getMessage(String html){
+    /**
+     * return message from server when link expired which start with "Ten link wygasł"
+     * otherwise return empty string
+     */
+    public static String getMessageIfLinkExpired(String html){
         String line = getLineMessage(html);
         int firstIndex = line.indexOf("Ten link wygasł");
 
