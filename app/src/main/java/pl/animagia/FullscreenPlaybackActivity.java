@@ -4,10 +4,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.android.volley.VolleyError;
@@ -31,10 +35,6 @@ import pl.animagia.user.Cookies;
 import pl.animagia.video.VideoSourcesKt;
 import pl.animagia.video.VideoUrl;
 
-/**
- * An example full-screen activity that shows and hides the system UI (i.e.
- * status bar and navigation/system bar) with user interaction.
- */
 public class FullscreenPlaybackActivity extends AppCompatActivity {
 
 
@@ -50,27 +50,25 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private AppCompatActivity control;
     private boolean on_off, firstOnStart = true;
 
-    private Context context;
+    private Context context; //FIXME remove and use 'this' or 'getApplicationContext'
     private String cookie;
-
-    private boolean systemUiAndControlsVisible;
 
     private Handler mHideHandler;
 
-    Runnable rExpire = new Runnable()
+    Runnable playerRestarter = new Runnable()
     {
         public void run()
         {
             if(mPlayer != null){
 
-                if (on_off == true) {
+                if (on_off) {
                     if ((mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY) ||
-                            (mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_BUFFERING) ) {
+                            (mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_BUFFERING)) {
 
-                    }else{
+                    } else {
                         Toast.makeText(context, "Restart playera", Toast.LENGTH_SHORT).show();
-                        reinitializationPlayer();
-                        }
+                        reinitializePlayer("");
+                    }
                     on_off = false;
                 }
             }
@@ -79,7 +77,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     };
 
     final Handler handler = new Handler();
-    final Runnable r = new Runnable()
+
+    final Runnable r = new Runnable() //FIXME rename
     {
         public void run()
         {
@@ -102,6 +101,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
             }
         }
     };
+    private long lastTimeSystemUiWasBroughtBack;
 
 
     @Override
@@ -131,8 +131,9 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         mMainView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
-                if(systemUiAndControlsVisible) {
-                    hide();
+                if(motionEvent.getAction() == MotionEvent.ACTION_UP &&
+                        readyToHideSystemUi()) {
+                    hideSystemUi();
                 }
                 return true;
             }
@@ -149,6 +150,29 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         }
 
         mPlayer.setPlayWhenReady(true);
+        initSpinner();
+
+    }
+
+    /**
+     * Checks if navbar has been visible for long enough to allow it to be hidden safely
+     * (hiding navbar too soon can glitch it).
+     */
+    private boolean readyToHideSystemUi() {
+        return SystemClock.elapsedRealtime() - 600 > lastTimeSystemUiWasBroughtBack;
+    }
+
+    private void hideSystemUi() {
+        mMainView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    private static boolean systemUiVisible(int systemUiVisibility) {
+        return (systemUiVisibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
     }
 
     @Override
@@ -159,7 +183,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         View play = controlView.findViewById(R.id.exo_play);
         play.performClick();
 
-        mHideHandler.postDelayed(rExpire,4000);
+        mHideHandler.postDelayed(playerRestarter,4000);
         on_off = true;
     }
 
@@ -182,7 +206,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         View play = controlView.findViewById(R.id.exo_play);
         play.performClick();
 
-        mHideHandler.postDelayed(rExpire,4000);
+        mHideHandler.postDelayed(playerRestarter,4000);
         on_off = true;
     }
 
@@ -190,21 +214,110 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
 
-        mHideHandler.removeCallbacks(rExpire);
-        rExpire = null;
+        mHideHandler.removeCallbacks(playerRestarter);
+        playerRestarter = null;
     }
 
     private void runTimer(){
 
-         mHideHandler = new Handler();
-         mHideHandler.postDelayed(rExpire,4000);
+        mHideHandler = new Handler();
+        mHideHandler.postDelayed(playerRestarter,4000);
 
-     }
+    }
 
+    private void initSpinner(){
+        Spinner spinnerOfQuality = findViewById(R.id.spinner_quality);
+        String[] quality = getResources().getStringArray(R.array.quality);
+        ArrayAdapter<String> adapterQuality = new ArrayAdapter<>(
+                this, R.layout.spinner_item, quality
+        );
 
-    private void reinitializationPlayer(){
+        adapterQuality.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
-        HTML.getHtml(currentUrl, getApplicationContext(), new VolleyCallback() {
+        spinnerOfQuality.setAdapter(adapterQuality);
+        spinnerOfQuality.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+            boolean start = true;
+            Spinner spinnerOfSubtitles = findViewById(R.id.spinner_subtitles);
+            String query;
+
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                query = String.valueOf(spinnerOfSubtitles.getSelectedItem());
+                switch(i){
+                    case 0:
+                        if(!start){
+                            if(query.equals("pl")){
+                                reinitializePlayer("?altsub=yes?res=hd");
+                            }else{
+                                reinitializePlayer("?altsub=no?res=hd");
+                            }
+                        }
+                        start = false;
+                        break;
+                    case 1:
+                        if(query.equals("pl")){
+                            reinitializePlayer("?altsub=yes?res=sd");
+                        }else{
+                            reinitializePlayer("?altsub=no?res=sd");
+                        }
+                        break;
+                }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        Spinner spinnerOfSubtitles = findViewById(R.id.spinner_subtitles);
+        String[] subtitle = getResources().getStringArray(R.array.subtitles);
+        ArrayAdapter<String> adapterSubtitles = new ArrayAdapter<>(
+                this, R.layout.spinner_item, subtitle
+        );
+
+        adapterSubtitles.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        spinnerOfSubtitles.setAdapter(adapterSubtitles);
+
+        spinnerOfSubtitles.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+
+            Spinner spinnerOfQuality = findViewById(R.id.spinner_quality);
+            String query;
+            boolean start = true;
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                query = String.valueOf(spinnerOfQuality.getSelectedItem());
+                switch(i){
+                    case 0:
+                        if(!start){
+                            if(query.equals("1080p")){
+                                reinitializePlayer("?altsub=no?res=hd");
+                            }else{
+                                reinitializePlayer("?altsub=no?res=sd");
+                            }
+                        }
+                        start = false;
+                        break;
+                    case 1:
+                        if(query.equals("1080p")){
+                            reinitializePlayer( "?altsub=yes?res=hd");
+                        }else{
+                            reinitializePlayer( "?altsub=yes?res=sd");
+                        }
+                        break;
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+    }
+
+    private void reinitializePlayer(String query){
+
+        HTML.getHtml(currentUrl + query, getApplicationContext(), new VolleyCallback() {
 
             @Override
             public void onSuccess(String result) {
@@ -223,14 +336,14 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                     TextView title = findViewById(R.id.film_name);
                     title.setText(currentTitle + " odc. " + currentEpisode);
                 }
-                mHideHandler.postDelayed(rExpire,4000);
+                mHideHandler.postDelayed(playerRestarter,4000);
                 on_off = true;
 
             }
 
             @Override
             public void onFailure(VolleyError volleyError) {
-                mHideHandler.postDelayed(rExpire,4000);
+                mHideHandler.postDelayed(playerRestarter,4000);
                 on_off = true;
             }
         });
@@ -262,13 +375,11 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                 (new View.OnSystemUiVisibilityChangeListener() {
                     @Override
                     public void onSystemUiVisibilityChange(int visibility) {
-                        if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                            //navbar visible
-                            systemUiAndControlsVisible = true;
+                        if (systemUiVisible(visibility)) {
                             mMainView.showController();
+                            lastTimeSystemUiWasBroughtBack = SystemClock.elapsedRealtime();
                         } else {
-                            //navbar not visible
-                            hide();
+                            mMainView.hideController();
                         }
                     }
                 });
@@ -279,7 +390,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus ) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            hide();
+            hideSystemUi();
         }
     }
 
@@ -351,25 +462,9 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         previous.setVisibility(View.INVISIBLE);
     }
 
-
-    private void hide() {
-        systemUiAndControlsVisible = false;
-        hideSystemUi();
-        mMainView.hideController();
-    }
-
-    private void hideSystemUi() {
-        mMainView.setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-    }
-
     private boolean isPrime(String title) {
         boolean prime = true;
-        if (title.equals("Chuunibyou demo Koi ga Shitai! Take On Me")){
+        if (title.equals("Chuunibyou demo Koi ga Shitai! Take On Me")){  //FIXME
             prime = false;
         }
         return prime;
@@ -406,8 +501,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         releaseMediaPlayer();
-        mHideHandler.removeCallbacks(rExpire);
-        rExpire = null;
+        mHideHandler.removeCallbacks(playerRestarter);
+        playerRestarter = null;
         finish();
     }
 
@@ -432,7 +527,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if (checkEpisodes(newEpisode)) {
 
-                    HTML.getHtml(video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode), getApplicationContext(), new VolleyCallback() {
+                    HTML.getHtml(video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode) + "?altsub=no?res=hd", getApplicationContext(), new VolleyCallback() {
 
                         @Override
                         public void onSuccess(String result) {
@@ -454,13 +549,13 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                             changeCurrentEpisodes(newEpisode);
                             TextView title = findViewById(R.id.film_name);
                             title.setText(video.getTitle() + " odc. " + currentEpisode);
-                            mHideHandler.postDelayed(rExpire,4000);
+                            mHideHandler.postDelayed(playerRestarter,4000);
                             on_off = true;
                         }
 
                         @Override
                         public void onFailure(VolleyError volleyError) {
-                            mHideHandler.postDelayed(rExpire,4000);
+                            mHideHandler.postDelayed(playerRestarter,4000);
                             on_off = true;
                         }
                     });
