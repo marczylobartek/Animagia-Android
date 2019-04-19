@@ -2,7 +2,6 @@ package pl.animagia;
 
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -255,7 +254,19 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private static boolean systemUiVisible(int systemUiVisibility) {
         return (systemUiVisibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
     }
-    
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        PlayerControlView controlView = ViewUtilsKt.getPlayerControlView(mMainView);
+        View play = controlView.findViewById(R.id.exo_play);
+        play.performClick();
+
+        mHideHandler.postDelayed(playerRestarter,4000);
+        on_off = true;
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -267,15 +278,12 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     }
 
     @Override
-<<<<<<< HEAD
-=======
     protected void onStop() {
         super.onStop();
         mHideHandler.removeCallbacks(playerRestarter);
     }
 
     @Override
->>>>>>> upstream/master
     protected void onDestroy() {
         super.onDestroy();
 
