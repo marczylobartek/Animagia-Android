@@ -15,7 +15,6 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 import com.android.volley.VolleyError;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Player;
@@ -32,8 +31,6 @@ import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.ListIterator;
 
 import pl.animagia.error.Alerts;
@@ -264,25 +261,26 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         super.onStart();
 
         if(firstOnStart){
-            runTimer();
+            mHideHandler = new Handler();
             firstOnStart = false;
         }
-
     }
 
     @Override
+<<<<<<< HEAD
+=======
+    protected void onStop() {
+        super.onStop();
+        mHideHandler.removeCallbacks(playerRestarter);
+    }
+
+    @Override
+>>>>>>> upstream/master
     protected void onDestroy() {
         super.onDestroy();
 
         mHideHandler.removeCallbacks(playerRestarter);
         playerRestarter = null;
-    }
-
-    private void runTimer(){
-
-        mHideHandler = new Handler();
-        mHideHandler.postDelayed(playerRestarter,4000);
-
     }
 
     private void initSpinner(){
@@ -533,6 +531,7 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     public void onPause(){
         super.onPause();
         resumeLivePreview();
+        mHideHandler.removeCallbacks(playerRestarter);
     }
 
 
