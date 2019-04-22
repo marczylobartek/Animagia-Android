@@ -42,6 +42,7 @@ import pl.animagia.video.VideoUrl;
 public class FullscreenPlaybackActivity extends AppCompatActivity {
 
 
+    public static final int REWINDER_INTERVAL = 500;
     private PlayerView mMainView;
     private ImageButton forwardPlayerButton, rewindPlayerButton ;
     private SimpleExoPlayer mPlayer;
@@ -49,8 +50,12 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
     private int currentEpisode;
     private String currentTitle;
     private String currentUrl;
+
+    private int previewMilliseconds = Integer.MAX_VALUE;
+
     private String timeStampUnconverted;
     private String [] timeStamps;
+
     private AppCompatActivity control;
     private boolean on_off, firstOnStart = true;
 
@@ -81,17 +86,17 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
     final Handler handler = new Handler();
 
-    final Runnable r = new Runnable() //FIXME rename
+    final Runnable rewinder = new Runnable()
     {
         public void run()
         {
             long sek = mPlayer.getCurrentPosition();
-            if(sek >= 420000){
-                mPlayer.seekTo(415000);
+            if(sek >= previewMilliseconds){
+                mPlayer.seekTo(previewMilliseconds - 1000);
                 Alerts.primeVideoError(context);
                 onPause();
             }
-            handler.postDelayed(this, 300);
+            handler.postDelayed(this, REWINDER_INTERVAL);
         }
     };
 
@@ -119,14 +124,14 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
         episodes = video.getEpisodes();
         currentEpisode = 1;
-        currentTitle = video.getTitle();
+        currentTitle = video.formatFullTitle();
         currentUrl = video.getVideoUrl();
 
         setContentView(R.layout.activity_fullscreen_playback);
         mMainView = findViewById(R.id.exoplayerview_activity_video);
 
         TextView title = findViewById(R.id.film_name);
-        title.setText(currentTitle + " odc. " + currentEpisode);
+        title.setText(formatTitle());
 
         timeStampUnconverted = video.getTimeStamps();
         timeStamps = timeStampUnconverted.split(";");
@@ -155,9 +160,12 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
 
         mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(this, url, video.getTitle()));
-        if(!isPrime(video.getTitle())){
+        if(isPremiumFilm(video.getTitle())){
+
+            previewMilliseconds = video.getPreviewMillis();
+
             if(cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
-                handler.postDelayed(r, 300);
+                handler.postDelayed(rewinder, REWINDER_INTERVAL);
             }
         }
 
@@ -232,6 +240,11 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
             forwardPlayerButton.setOnClickListener(listener);
             rewindPlayerButton.setOnClickListener(listener);
         }
+    }
+
+
+    private String formatTitle() {
+        return episodes > 1 ? currentTitle + " odc. " + currentEpisode : currentTitle;
     }
 
     /**
@@ -313,18 +326,18 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                     case 0:
                         if(!start){
                             if(query.equals("pl")){
-                                reinitializePlayer("?altsub=yes?res=hd");
+                                reinitializePlayer("?altsub=yes&sd=no");
                             }else{
-                                reinitializePlayer("?altsub=no?res=hd");
+                                reinitializePlayer("?altsub=no&sd=no");
                             }
                         }
                         start = false;
                         break;
                     case 1:
                         if(query.equals("pl")){
-                            reinitializePlayer("?altsub=yes?res=sd");
+                            reinitializePlayer("?altsub=yes&sd=yes");
                         }else{
-                            reinitializePlayer("?altsub=no?res=sd");
+                            reinitializePlayer("?altsub=no&sd=yes");
                         }
                         break;
                 }
@@ -357,18 +370,18 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                     case 0:
                         if(!start){
                             if(query.equals("1080p")){
-                                reinitializePlayer("?altsub=no?res=hd");
+                                reinitializePlayer("?altsub=no&sd=no");
                             }else{
-                                reinitializePlayer("?altsub=no?res=sd");
+                                reinitializePlayer("?altsub=no&sd=yes");
                             }
                         }
                         start = false;
                         break;
                     case 1:
                         if(query.equals("1080p")){
-                            reinitializePlayer( "?altsub=yes?res=hd");
+                            reinitializePlayer( "?altsub=yes&sd=no");
                         }else{
-                            reinitializePlayer( "?altsub=yes?res=sd");
+                            reinitializePlayer( "?altsub=yes&sd=yes");
                         }
                         break;
                 }
@@ -390,16 +403,16 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                 releaseMediaPlayer();
                 String url = VideoUrl.getUrl(result);
                 mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(control, url, currentTitle));
-                if (!isPrime(currentTitle)) {
+                if (!isPremiumFilm(currentTitle)) {
                     if (cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
-                        handler.postDelayed(r, 300);
+                        handler.postDelayed(rewinder, REWINDER_INTERVAL);
                     }
                 }
 
                 mPlayer.setPlayWhenReady(true);
 
                     TextView title = findViewById(R.id.film_name);
-                    title.setText(currentTitle + " odc. " + currentEpisode);
+                    title.setText(formatTitle());
 
                 mHideHandler.postDelayed(playerRestarter,4000);
                 on_off = true;
@@ -527,12 +540,11 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
         previous.setVisibility(View.INVISIBLE);
     }
 
-    private boolean isPrime(String title) {
-        boolean prime = true;
-        if (title.equals("Chuunibyou demo Koi ga Shitai! Take On Me")){  //FIXME
-            prime = false;
+    private boolean isPremiumFilm(String title) {
+        if (title.contains("Amagi")){
+            return false;
         }
-        return prime;
+        return true;
     }
 
     @Override
@@ -551,8 +563,8 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
 
 
     private void releaseMediaPlayer() {
-        if (r != null) {
-            handler.removeCallbacks(r);
+        if (rewinder != null) {
+            handler.removeCallbacks(rewinder);
         }
         if (hideUi != null) {
             handler.removeCallbacks(hideUi);
@@ -593,20 +605,27 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if (checkEpisodes(newEpisode)) {
 
-                    HTML.getHtml(video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode) + "?altsub=no?res=hd", getApplicationContext(), new VolleyCallback() {
+                    String url =
+                            video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) +
+                                    (currentEpisode + newEpisode) + "?altsub=no&sd=no";
+
+                    HTML.getHtml(url, getApplicationContext(), new VolleyCallback() {
 
                         @Override
                         public void onSuccess(String result) {
 
-                            currentTitle = video.getTitle();
-                            currentUrl = video.getVideoUrl().substring(0, video.getVideoUrl().length() - 2) + (currentEpisode + newEpisode);
+                            currentTitle = video.formatFullTitle();
+                            currentUrl = video.getVideoUrl()
+                                    .substring(0, video.getVideoUrl().length() - 2) +
+                                    (currentEpisode + newEpisode);
 
                             releaseMediaPlayer();
                             String url = VideoUrl.getUrl(result);
-                            mPlayer = createPlayer(VideoSourcesKt.prepareFromAsset(activity, url, video.getTitle()));
-                            if (!isPrime(video.getTitle())) {
+                            mPlayer = createPlayer(VideoSourcesKt
+                                    .prepareFromAsset(activity, url, video.getTitle()));
+                            if (!isPremiumFilm(video.getTitle())) {
                                 if (cookie.equals(Cookies.COOKIE_NOT_FOUND)) {
-                                    handler.postDelayed(r, 300);
+                                    handler.postDelayed(rewinder, REWINDER_INTERVAL);
                                 }
                             }
 
@@ -615,17 +634,16 @@ public class FullscreenPlaybackActivity extends AppCompatActivity {
                             changeCurrentEpisodes(newEpisode);
                             TextView title = findViewById(R.id.film_name);
                             title.setText(video.getTitle() + " odc. " + currentEpisode);
-                            mHideHandler.postDelayed(playerRestarter,4000);
+                            mHideHandler.postDelayed(playerRestarter, 4000);
                             on_off = true;
                         }
 
                         @Override
                         public void onFailure(VolleyError volleyError) {
-                            mHideHandler.postDelayed(playerRestarter,4000);
+                            mHideHandler.postDelayed(playerRestarter, 4000);
                             on_off = true;
                         }
                     });
-
 
                 }
 

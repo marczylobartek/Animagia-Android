@@ -12,7 +12,7 @@
     <string name="title_activity_fullscreen_playback">Wideo</string>
     <string name="nav_section_company">Wydawnictwo</string>
     <string name="contact_info">Kontakt</string>
-    <string name="documents">Dokumenty</string>
+    <string name="documents">Informacje</string>
     <string name="terms">Regulamin</string>
     <string name="title_activity_login">Logowanie</string>
     <string name="title_activity_document">DocumentActivity</string>
@@ -35,6 +35,15 @@
     <string name="no_account_needed">Nasza aplikacja nie wymaga zakładania konta.\n
         Dokonane zakupy będą widoczne tutaj,\notrzymasz też kody aktywacyjne na mail
     powiązany\nz płatnością, dzięki czemu nic nie przepadnie.</string>
+
+    <string name="concise_info">Korzystanie z naszej aplikacji bez logowania się na konto
+        nie wymaga akceptacji regulaminu, w takim przypadku nie zbieramy też
+        żadnych danych osobowych. Jeśli zalogujesz się na konto założone wcześniej
+        na naszej stronie, obowiązują regulamin i polityka prywatności i ciasteczek
+        zaakceptowane na stronie.</string>
+
+    <string name="documents_into">Poniższe dokumenty
+        otworzą się w przeglądarce internetowej:</string>
 
     <string-array name="quality">
         <item>1080p</item>
